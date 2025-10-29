@@ -1,3 +1,10 @@
 Flask==3.0.0
-# markitdown==0.0.1a2
+markitdown
 Werkzeug==3.0.1
+
+# Additional dependencies for MarkItDown to support various formats
+# These are typically installed automatically with markitdown, but listing them explicitly:
+# - openpyxl (for Excel files)
+# - python-pptx (for PowerPoint files)
+# - python-docx (for Word files)
+# - PyPDF2 or pdfplumber (for PDF files)

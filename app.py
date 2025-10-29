@@ -7,8 +7,13 @@ import database
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx'}
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
+ALLOWED_EXTENSIONS = {
+    'pdf',           # PDF files
+    'doc', 'docx',   # Word documents
+    'xls', 'xlsx',   # Excel spreadsheets
+    'ppt', 'pptx'    # PowerPoint presentations
+}
 
 # Initialize MarkItDown converter
 md_converter = MarkItDown()
@@ -176,4 +181,4 @@ if __name__ == '__main__':
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
     # Run the app
-    app.run(debug=True, host='127.0.0.1', port=5000)
+    app.run(debug=True, host='127.0.0.1', port=5003)

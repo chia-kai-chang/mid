@@ -345,18 +345,19 @@
     <div class="container">
         <div class="header">
             <h1>文件資料庫系統</h1>
-            <p>上傳、搜尋、管理您的文件 (支援 Word, PDF)</p>
+            <p>上傳、搜尋、管理您的文件 (支援 Word, Excel, PowerPoint, PDF)</p>
         </div>
 
         <div class="content">
             <!-- Upload Section -->
             <div class="section">
                 <h2>上傳文件</h2>
+                <input type="file" id="fileInput" class="file-input" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
+
                 <div class="upload-area" id="uploadArea">
                     <div class="upload-icon">📁</div>
                     <p>拖放文件到此處，或點擊選擇文件</p>
-                    <p style="color: #999; font-size: 0.9em; margin-top: 10px;">支援格式: PDF, Word (DOC, DOCX)</p>
-                    <input type="file" id="fileInput" class="file-input" multiple accept=".pdf,.doc,.docx">
+                    <p style="color: #999; font-size: 0.9em; margin-top: 10px;">支援格式: PDF, Word (DOC/DOCX), Excel (XLS/XLSX), PowerPoint (PPT/PPTX)</p>
                 </div>
 
                 <div class="file-list" id="fileList"></div>
