@@ -365,6 +365,34 @@
         </div>
     </div>
 
+    <!-- Reset Password Modal -->
+    <div class="modal" id="resetPasswordModal">
+        <div class="modal-content">
+            <h3>重置用戶密碼</h3>
+            <div class="error-message" id="resetPasswordError"></div>
+            <form id="resetPasswordForm">
+                <input type="hidden" id="resetUserId">
+                <div class="form-group">
+                    <label>用戶名</label>
+                    <input type="text" id="resetUsername" readonly style="background: #f5f5f5; cursor: not-allowed;">
+                </div>
+                <div class="form-group">
+                    <label for="resetNewPassword">新密碼</label>
+                    <input type="password" id="resetNewPassword" required minlength="6">
+                    <small style="color: #666;">密碼長度至少 6 個字符</small>
+                </div>
+                <div class="form-group">
+                    <label for="resetConfirmPassword">確認新密碼</label>
+                    <input type="password" id="resetConfirmPassword" required minlength="6">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-cancel" id="cancelResetBtn">取消</button>
+                    <button type="submit" class="btn">更新密碼</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
@@ -488,6 +516,8 @@
                         const roleName = user.role === 'admin' ? '管理員' : '使用者';
                         const date = new Date(user.created_at).toLocaleDateString('zh-TW');
 
+                        const resetPasswordBtn = `<button class="btn-delete" style="background: #ffa500; margin-right: 5px;" onclick="showResetPassword(${user.id}, '${user.username}')">重置密碼</button>`;
+
                         const deleteBtn = user.id === currentUserId
                             ? '<span style="color: #999;">無法刪除</span>'
                             : `<button class="btn-delete" onclick="deleteUser(${user.id}, '${user.username}')">刪除</button>`;
@@ -497,7 +527,7 @@
                                 <td>${user.username}</td>
                                 <td><span class="role-badge ${roleClass}">${roleName}</span></td>
                                 <td>${date}</td>
-                                <td>${deleteBtn}</td>
+                                <td>${resetPasswordBtn}${deleteBtn}</td>
                             </tr>
                         `;
                         tbody.append(row);
@@ -552,6 +582,73 @@
 
         function showModalError(message) {
             $('#modalError').text(message).show();
+        }
+
+        // Reset password functionality
+        function showResetPassword(userId, username) {
+            $('#resetUserId').val(userId);
+            $('#resetUsername').val(username);
+            $('#resetPasswordModal').show();
+            $('#resetPasswordForm')[0].reset();
+            $('#resetUserId').val(userId);
+            $('#resetUsername').val(username);
+            $('#resetPasswordError').hide();
+        }
+
+        $('#cancelResetBtn').on('click', function() {
+            $('#resetPasswordModal').hide();
+        });
+
+        $('#resetPasswordForm').on('submit', function(e) {
+            e.preventDefault();
+
+            const userId = $('#resetUserId').val();
+            const newPassword = $('#resetNewPassword').val();
+            const confirmPassword = $('#resetConfirmPassword').val();
+
+            if (!newPassword || !confirmPassword) {
+                showResetPasswordError('請填寫所有欄位');
+                return;
+            }
+
+            if (newPassword.length < 6) {
+                showResetPasswordError('密碼長度至少為 6 個字符');
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                showResetPasswordError('新密碼和確認密碼不一致');
+                return;
+            }
+
+            $.ajax({
+                url: '/api/users/' + userId + '/change_password',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    new_password: newPassword
+                }),
+                success: function(response) {
+                    if (response.success) {
+                        $('#resetPasswordModal').hide();
+                        Swal.fire({
+                            icon: 'success',
+                            title: '成功',
+                            text: '密碼已重置',
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON?.error || '重置密碼失敗';
+                    showResetPasswordError(error);
+                }
+            });
+        });
+
+        function showResetPasswordError(message) {
+            $('#resetPasswordError').text(message).show();
         }
     </script>
 </body>

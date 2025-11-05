@@ -321,10 +321,10 @@ def delete_user(user_id):
     else:
         return jsonify({'error': result['error']}), 400
 
-@app.route('/api/change_password', methods=['POST'])
-@login_required
-def change_password():
-    """Change user password"""
+@app.route('/api/users/<int:user_id>/change_password', methods=['POST'])
+@admin_required
+def admin_change_user_password(user_id):
+    """Change a user's password (admin only, no old password required)"""
     data = request.get_json()
     new_password = data.get('new_password')
 
@@ -333,6 +333,36 @@ def change_password():
 
     if len(new_password) < 6:
         return jsonify({'error': '密碼長度至少為 6 個字符'}), 400
+
+    # Check if user exists
+    user = database.get_user_by_id(user_id)
+    if not user:
+        return jsonify({'error': '用戶不存在'}), 404
+
+    result = database.update_user_password(user_id, new_password)
+
+    if result['success']:
+        return jsonify({'success': True, 'message': '密碼已更新'})
+    else:
+        return jsonify({'error': '更新密碼失敗'}), 500
+
+@app.route('/api/change_password', methods=['POST'])
+@login_required
+def change_password():
+    """Change user password (requires old password)"""
+    data = request.get_json()
+    old_password = data.get('old_password')
+    new_password = data.get('new_password')
+
+    if not old_password or not new_password:
+        return jsonify({'error': '請輸入舊密碼和新密碼'}), 400
+
+    if len(new_password) < 6:
+        return jsonify({'error': '密碼長度至少為 6 個字符'}), 400
+
+    # Verify old password
+    if not database.verify_user_password(session['user_id'], old_password):
+        return jsonify({'error': '舊密碼錯誤'}), 400
 
     result = database.update_user_password(session['user_id'], new_password)
 

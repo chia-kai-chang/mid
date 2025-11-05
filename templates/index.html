@@ -55,7 +55,7 @@
             right: 30px;
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 10px;
         }
 
         .user-badge {
@@ -87,6 +87,22 @@
         .btn-logout:hover {
             background: rgba(255, 255, 255, 0.3);
             border-color: white;
+        }
+
+        .btn-change-password {
+            background: rgba(255, 255, 255, 0.9);
+            color: #667eea;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 20px;
+            font-size: 0.85em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-change-password:hover {
+            background: white;
+            transform: scale(1.05);
         }
 
         .btn-admin {
@@ -411,6 +427,7 @@
                     <span id="username">{{ user.username }}</span>
                     <span class="role" id="userRole">{{ '管理員' if user.role == 'admin' else '使用者' }}</span>
                 </div>
+                <button class="btn-change-password" id="changePasswordBtn">🔑 修改密碼</button>
                 {% if user.role == 'admin' %}
                 <a href="/admin" class="btn-admin">👥 用戶管理</a>
                 {% endif %}
@@ -486,6 +503,34 @@
         </div>
     </div>
 
+    <!-- Change Password Modal -->
+    <div class="modal" id="changePasswordModal">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close-modal" id="closePasswordModal">&times;</span>
+            <h2 style="color: #667eea; margin-bottom: 20px;">修改密碼</h2>
+            <div class="error-message" id="passwordError"></div>
+            <form id="changePasswordForm">
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="oldPassword" style="display: block; color: #333; font-weight: bold; margin-bottom: 8px;">舊密碼</label>
+                    <input type="password" id="oldPassword" required style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 5px; font-size: 1em;">
+                </div>
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="newPassword" style="display: block; color: #333; font-weight: bold; margin-bottom: 8px;">新密碼</label>
+                    <input type="password" id="newPassword" required minlength="6" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 5px; font-size: 1em;">
+                    <small style="color: #666;">密碼長度至少 6 個字符</small>
+                </div>
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="confirmPassword" style="display: block; color: #333; font-weight: bold; margin-bottom: 8px;">確認新密碼</label>
+                    <input type="password" id="confirmPassword" required minlength="6" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 5px; font-size: 1em;">
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" class="btn btn-cancel" id="cancelPasswordBtn" style="background: #ddd; color: #333;">取消</button>
+                    <button type="submit" class="btn">更新密碼</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
@@ -502,6 +547,72 @@
                 }
             });
         });
+
+        // Change password functionality
+        $('#changePasswordBtn').on('click', function() {
+            $('#changePasswordModal').show();
+            $('#changePasswordForm')[0].reset();
+            $('#passwordError').hide();
+        });
+
+        $('#closePasswordModal, #cancelPasswordBtn').on('click', function() {
+            $('#changePasswordModal').hide();
+        });
+
+        $('#changePasswordForm').on('submit', function(e) {
+            e.preventDefault();
+
+            const oldPassword = $('#oldPassword').val();
+            const newPassword = $('#newPassword').val();
+            const confirmPassword = $('#confirmPassword').val();
+
+            // Validation
+            if (!oldPassword || !newPassword || !confirmPassword) {
+                showPasswordError('請填寫所有欄位');
+                return;
+            }
+
+            if (newPassword.length < 6) {
+                showPasswordError('新密碼長度至少為 6 個字符');
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                showPasswordError('新密碼和確認密碼不一致');
+                return;
+            }
+
+            // Submit password change
+            $.ajax({
+                url: '/api/change_password',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    old_password: oldPassword,
+                    new_password: newPassword
+                }),
+                success: function(response) {
+                    if (response.success) {
+                        $('#changePasswordModal').hide();
+                        Swal.fire({
+                            icon: 'success',
+                            title: '成功',
+                            text: '密碼已更新',
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON?.error || '更新密碼失敗';
+                    showPasswordError(error);
+                }
+            });
+        });
+
+        function showPasswordError(message) {
+            $('#passwordError').text(message).show();
+        }
 
         // Handle unauthorized errors globally
         $(document).ajaxError(function(event, xhr, settings) {

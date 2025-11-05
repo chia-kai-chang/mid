@@ -387,6 +387,25 @@ def delete_user(user_id):
         'success': True
     }
 
+def verify_user_password(user_id, password):
+    """Verify if the password is correct for the user"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT password_hash
+        FROM users
+        WHERE id = ?
+    ''', (user_id,))
+
+    user = cursor.fetchone()
+    conn.close()
+
+    if user and check_password_hash(user['password_hash'], password):
+        return True
+    return False
+
 def update_user_password(user_id, new_password):
     """Update user password"""
     conn = sqlite3.connect(DATABASE_PATH)
