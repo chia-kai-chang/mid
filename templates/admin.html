@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用戶管理 - 文件資料庫系統</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            position: relative;
+        }
+
+        .header-content {
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .user-info {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.95em;
+        }
+
+        .btn-back {
+            background: rgba(255, 255, 255, 0.9);
+            color: #667eea;
+            padding: 8px 20px;
+            border: none;
+            border-radius: 20px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-back:hover {
+            background: white;
+            transform: scale(1.05);
+        }
+
+        .btn-logout {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 20px;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 20px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-logout:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: white;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-delete {
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 6px 15px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .btn-delete:hover {
+            background: #cc0000;
+        }
+
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .users-table thead {
+            background: #f8f9ff;
+        }
+
+        .users-table th {
+            padding: 15px;
+            text-align: left;
+            color: #667eea;
+            font-weight: bold;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .users-table td {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .users-table tr:hover {
+            background: #f8f9ff;
+        }
+
+        .role-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+
+        .role-admin {
+            background: #ffeaa7;
+            color: #d63031;
+        }
+
+        .role-user {
+            background: #dfe6e9;
+            color: #2d3436;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            margin: 100px auto;
+            padding: 30px;
+            max-width: 500px;
+            border-radius: 15px;
+        }
+
+        .modal h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #333;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .btn-cancel {
+            background: #ddd;
+            color: #333;
+        }
+
+        .btn-cancel:hover {
+            background: #ccc;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="user-info">
+                <div class="user-badge">
+                    <span id="username"></span>
+                    <span style="margin-left: 8px;">👑 管理員</span>
+                </div>
+                <a href="/" class="btn-back">← 返回主頁</a>
+                <button class="btn-logout" id="logoutBtn">登出</button>
+            </div>
+            <div class="header-content">
+                <h1>👥 用戶管理</h1>
+                <p>管理系統用戶和權限</p>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>用戶列表</h2>
+                    <button class="btn" id="addUserBtn">+ 新增用戶</button>
+                </div>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p style="margin-top: 10px;">載入中...</p>
+                </div>
+
+                <table class="users-table" id="usersTable" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th>用戶名</th>
+                            <th>角色</th>
+                            <th>創建日期</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div class="modal" id="addUserModal">
+        <div class="modal-content">
+            <h3>新增用戶</h3>
+            <div class="error-message" id="modalError"></div>
+            <form id="addUserForm">
+                <div class="form-group">
+                    <label for="newUsername">用戶名</label>
+                    <input type="text" id="newUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="newPassword">密碼</label>
+                    <input type="password" id="newPassword" required minlength="6">
+                    <small style="color: #666;">密碼長度至少 6 個字符</small>
+                </div>
+                <div class="form-group">
+                    <label for="newRole">角色</label>
+                    <select id="newRole">
+                        <option value="user">使用者</option>
+                        <option value="admin">管理員</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-cancel" id="cancelBtn">取消</button>
+                    <button type="submit" class="btn">創建</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        let currentUserId = null;
+
+        $(document).ready(function() {
+            loadCurrentUser();
+            loadUsers();
+
+            // Logout
+            $('#logoutBtn').on('click', function() {
+                $.ajax({
+                    url: '/api/logout',
+                    method: 'POST',
+                    success: function() {
+                        window.location.href = '/login';
+                    }
+                });
+            });
+
+            // Show add user modal
+            $('#addUserBtn').on('click', function() {
+                $('#addUserModal').show();
+                $('#addUserForm')[0].reset();
+                $('#modalError').hide();
+            });
+
+            // Hide modal
+            $('#cancelBtn').on('click', function() {
+                $('#addUserModal').hide();
+            });
+
+            // Submit new user
+            $('#addUserForm').on('submit', function(e) {
+                e.preventDefault();
+
+                const username = $('#newUsername').val().trim();
+                const password = $('#newPassword').val();
+                const role = $('#newRole').val();
+
+                if (!username || !password) {
+                    showModalError('請填寫所有欄位');
+                    return;
+                }
+
+                if (password.length < 6) {
+                    showModalError('密碼長度至少為 6 個字符');
+                    return;
+                }
+
+                $.ajax({
+                    url: '/api/users',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        username: username,
+                        password: password,
+                        role: role
+                    }),
+                    success: function(response) {
+                        if (response.success) {
+                            $('#addUserModal').hide();
+                            Swal.fire({
+                                icon: 'success',
+                                title: '成功',
+                                text: '用戶已創建',
+                                timer: 2000,
+                                showConfirmButton: false
+                            });
+                            loadUsers();
+                        }
+                    },
+                    error: function(xhr) {
+                        const error = xhr.responseJSON?.error || '創建失敗';
+                        showModalError(error);
+                    }
+                });
+            });
+
+            // Handle unauthorized
+            $(document).ajaxError(function(event, xhr) {
+                if (xhr.status === 401) {
+                    alert('您的登入已過期，請重新登入');
+                    window.location.href = '/login';
+                } else if (xhr.status === 403) {
+                    alert('您沒有權限執行此操作');
+                    window.location.href = '/';
+                }
+            });
+        });
+
+        function loadCurrentUser() {
+            $.ajax({
+                url: '/api/current_user',
+                method: 'GET',
+                success: function(response) {
+                    if (response.logged_in) {
+                        currentUserId = response.user.id;
+                        $('#username').text(response.user.username);
+                    }
+                }
+            });
+        }
+
+        function loadUsers() {
+            $('#loading').show();
+            $('#usersTable').hide();
+
+            $.ajax({
+                url: '/api/users',
+                method: 'GET',
+                success: function(response) {
+                    $('#loading').hide();
+                    $('#usersTable').show();
+
+                    const tbody = $('#usersTableBody');
+                    tbody.empty();
+
+                    response.users.forEach(function(user) {
+                        const roleClass = user.role === 'admin' ? 'role-admin' : 'role-user';
+                        const roleName = user.role === 'admin' ? '管理員' : '使用者';
+                        const date = new Date(user.created_at).toLocaleDateString('zh-TW');
+
+                        const deleteBtn = user.id === currentUserId
+                            ? '<span style="color: #999;">無法刪除</span>'
+                            : `<button class="btn-delete" onclick="deleteUser(${user.id}, '${user.username}')">刪除</button>`;
+
+                        const row = `
+                            <tr>
+                                <td>${user.username}</td>
+                                <td><span class="role-badge ${roleClass}">${roleName}</span></td>
+                                <td>${date}</td>
+                                <td>${deleteBtn}</td>
+                            </tr>
+                        `;
+                        tbody.append(row);
+                    });
+                },
+                error: function() {
+                    $('#loading').hide();
+                    alert('載入用戶列表失敗');
+                }
+            });
+        }
+
+        function deleteUser(userId, username) {
+            Swal.fire({
+                title: '確認刪除',
+                text: `確定要刪除用戶 "${username}" 嗎？`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ff4444',
+                cancelButtonColor: '#ddd',
+                confirmButtonText: '刪除',
+                cancelButtonText: '取消'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        url: '/api/users/' + userId,
+                        method: 'DELETE',
+                        success: function(response) {
+                            if (response.success) {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: '已刪除',
+                                    text: '用戶已成功刪除',
+                                    timer: 2000,
+                                    showConfirmButton: false
+                                });
+                                loadUsers();
+                            }
+                        },
+                        error: function(xhr) {
+                            const error = xhr.responseJSON?.error || '刪除失敗';
+                            Swal.fire({
+                                icon: 'error',
+                                title: '錯誤',
+                                text: error
+                            });
+                        }
+                    });
+                }
+            });
+        }
+
+        function showModalError(message) {
+            $('#modalError').text(message).show();
+        }
+    </script>
+</body>
+</html>

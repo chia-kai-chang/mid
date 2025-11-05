@@ -2,6 +2,7 @@ import sqlite3
 import os
 import hashlib
 from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
 
 DATABASE_PATH = 'documents.db'
 
@@ -58,7 +59,7 @@ def init_db():
     # Try to migrate existing database first
     migrated = migrate_existing_database(cursor)
 
-    # Create table if not exists (for new databases)
+    # Create documents table if not exists
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS documents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,6 +78,30 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_content_hash
         ON documents(content_hash)
     ''')
+
+    # Create users table if not exists
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'user',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # Create default admin user if no users exist
+    cursor.execute('SELECT COUNT(*) FROM users')
+    user_count = cursor.fetchone()[0]
+
+    if user_count == 0:
+        admin_password_hash = generate_password_hash('admin123')
+        cursor.execute('''
+            INSERT INTO users (username, password_hash, role)
+            VALUES (?, ?, ?)
+        ''', ('admin', admin_password_hash, 'admin'))
+        print("✓ 已創建默認管理員帳號 - 用戶名: admin, 密碼: admin123")
+        print("⚠️ 請盡快修改默認密碼！")
 
     conn.commit()
     conn.close()
@@ -222,3 +247,162 @@ def delete_document(doc_id):
             'success': False,
             'error': 'Document not found'
         }
+
+# ==================== User Management Functions ====================
+
+def create_user(username, password, role='user'):
+    """Create a new user"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+
+        password_hash = generate_password_hash(password)
+
+        cursor.execute('''
+            INSERT INTO users (username, password_hash, role)
+            VALUES (?, ?, ?)
+        ''', (username, password_hash, role))
+
+        conn.commit()
+        user_id = cursor.lastrowid
+        conn.close()
+
+        return {
+            'success': True,
+            'user_id': user_id
+        }
+    except sqlite3.IntegrityError:
+        return {
+            'success': False,
+            'error': '用戶名已存在'
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+def verify_user(username, password):
+    """Verify user credentials"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT id, username, password_hash, role
+        FROM users
+        WHERE username = ?
+    ''', (username,))
+
+    user = cursor.fetchone()
+    conn.close()
+
+    if user and check_password_hash(user['password_hash'], password):
+        return {
+            'success': True,
+            'user': {
+                'id': user['id'],
+                'username': user['username'],
+                'role': user['role']
+            }
+        }
+    else:
+        return {
+            'success': False,
+            'error': '用戶名或密碼錯誤'
+        }
+
+def get_user_by_id(user_id):
+    """Get user by ID"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT id, username, role, created_at
+        FROM users
+        WHERE id = ?
+    ''', (user_id,))
+
+    user = cursor.fetchone()
+    conn.close()
+
+    return dict(user) if user else None
+
+def get_all_users():
+    """Get all users"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT id, username, role, created_at
+        FROM users
+        ORDER BY created_at DESC
+    ''')
+
+    users = cursor.fetchall()
+    conn.close()
+
+    return [dict(user) for user in users]
+
+def delete_user(user_id):
+    """Delete a user by ID"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+
+    # Don't allow deleting the last admin
+    cursor.execute('''
+        SELECT COUNT(*) FROM users WHERE role = 'admin'
+    ''')
+    admin_count = cursor.fetchone()[0]
+
+    cursor.execute('''
+        SELECT role FROM users WHERE id = ?
+    ''', (user_id,))
+    user = cursor.fetchone()
+
+    if not user:
+        conn.close()
+        return {
+            'success': False,
+            'error': '用戶不存在'
+        }
+
+    if user[0] == 'admin' and admin_count <= 1:
+        conn.close()
+        return {
+            'success': False,
+            'error': '無法刪除最後一個管理員帳號'
+        }
+
+    cursor.execute('''
+        DELETE FROM users WHERE id = ?
+    ''', (user_id,))
+
+    conn.commit()
+    conn.close()
+
+    return {
+        'success': True
+    }
+
+def update_user_password(user_id, new_password):
+    """Update user password"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+
+    password_hash = generate_password_hash(new_password)
+
+    cursor.execute('''
+        UPDATE users
+        SET password_hash = ?
+        WHERE id = ?
+    ''', (password_hash, user_id))
+
+    conn.commit()
+    conn.close()
+
+    return {
+        'success': True
+    }

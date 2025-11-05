@@ -1,13 +1,15 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for
 import os
 import uuid
 from werkzeug.utils import secure_filename
 from markitdown import MarkItDown
 import database
+from functools import wraps
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 ALLOWED_EXTENSIONS = {
     'pdf',           # PDF files
     'doc', 'docx',   # Word documents
@@ -17,6 +19,34 @@ ALLOWED_EXTENSIONS = {
 
 # Initialize MarkItDown converter
 md_converter = MarkItDown()
+
+# ==================== Authentication Decorators ====================
+
+def login_required(f):
+    """Decorator to require login"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login_page'))
+            # return jsonify({'error': '請先登入'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_required(f):
+    """Decorator to require admin role"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return jsonify({'error': '請先登入'}), 401
+
+        user = database.get_user_by_id(session['user_id'])
+        if not user or user['role'] != 'admin':
+            return jsonify({'error': '需要管理員權限'}), 403
+
+        return f(*args, **kwargs)
+    return decorated_function
+
+# ==================== Helper Functions ====================
 
 def allowed_file(filename):
     """Check if file extension is allowed"""
@@ -31,12 +61,80 @@ def extract_text_from_file(file_path):
         print(f"Error extracting text: {str(e)}")
         return ""
 
+# ==================== Authentication Routes ====================
+
+@app.route('/login', methods=['GET'])
+def login_page():
+    """Render the login page"""
+    if 'user_id' in session:
+        return redirect(url_for('index'))
+    return render_template('login.html')
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    """Handle user login"""
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+
+    if not username or not password:
+        return jsonify({'error': '請輸入用戶名和密碼'}), 400
+
+    result = database.verify_user(username, password)
+
+    if result['success']:
+        session['user_id'] = result['user']['id']
+        session['username'] = result['user']['username']
+        session['role'] = result['user']['role']
+        return jsonify({
+            'success': True,
+            'user': result['user']
+        })
+    else:
+        return jsonify({'error': result['error']}), 401
+
+@app.route('/api/logout', methods=['POST'])
+def logout():
+    """Handle user logout"""
+    session.clear()
+    return jsonify({'success': True})
+
+@app.route('/api/current_user', methods=['GET'])
+def get_current_user():
+    """Get current logged in user info"""
+    if 'user_id' in session:
+        user = database.get_user_by_id(session['user_id'])
+        if user:
+            return jsonify({
+                'logged_in': True,
+                'user': {
+                    'id': user['id'],
+                    'username': user['username'],
+                    'role': user['role']
+                }
+            })
+
+    return jsonify({'logged_in': False})
+
+# ==================== Main Routes ====================
+
 @app.route('/')
+@login_required
 def index():
     """Render the main page"""
-    return render_template('index.html')
+    user = database.get_user_by_id(session['user_id'])
+    return render_template('index.html', user=user)
+
+@app.route('/admin')
+@admin_required
+def admin_page():
+    """Render the admin page"""
+    return render_template('admin.html')
+
+# ==================== Document Routes ====================
 
 @app.route('/api/upload', methods=['POST'])
+@login_required
 def upload_files():
     """Handle file upload"""
     if 'files[]' not in request.files:
@@ -119,6 +217,7 @@ def upload_files():
     })
 
 @app.route('/api/search', methods=['GET'])
+@login_required
 def search():
     """Search for documents"""
     query = request.args.get('q', '')
@@ -133,6 +232,7 @@ def search():
     return jsonify({'results': results})
 
 @app.route('/api/document/<int:doc_id>', methods=['GET'])
+@login_required
 def get_document(doc_id):
     """Get document details"""
     document = database.get_document_by_id(doc_id)
@@ -143,6 +243,7 @@ def get_document(doc_id):
         return jsonify({'error': 'Document not found'}), 404
 
 @app.route('/api/download/<int:doc_id>', methods=['GET'])
+@login_required
 def download_file(doc_id):
     """Download original file"""
     document = database.get_document_by_id(doc_id)
@@ -157,6 +258,7 @@ def download_file(doc_id):
         return jsonify({'error': 'File not found'}), 404
 
 @app.route('/api/delete/<int:doc_id>', methods=['DELETE'])
+@login_required
 def delete_document(doc_id):
     """Delete a document"""
     result = database.delete_document(doc_id)
@@ -172,6 +274,72 @@ def delete_document(doc_id):
         return jsonify({'success': True, 'message': 'Document deleted successfully'})
     else:
         return jsonify({'success': False, 'error': result['error']}), 404
+
+# ==================== User Management Routes (Admin Only) ====================
+
+@app.route('/api/users', methods=['GET'])
+@admin_required
+def get_users():
+    """Get all users (admin only)"""
+    users = database.get_all_users()
+    return jsonify({'users': users})
+
+@app.route('/api/users', methods=['POST'])
+@admin_required
+def create_user():
+    """Create a new user (admin only)"""
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    role = data.get('role', 'user')
+
+    if not username or not password:
+        return jsonify({'error': '請輸入用戶名和密碼'}), 400
+
+    if role not in ['user', 'admin']:
+        return jsonify({'error': '無效的角色'}), 400
+
+    result = database.create_user(username, password, role)
+
+    if result['success']:
+        return jsonify({'success': True, 'user_id': result['user_id']})
+    else:
+        return jsonify({'error': result['error']}), 400
+
+@app.route('/api/users/<int:user_id>', methods=['DELETE'])
+@admin_required
+def delete_user(user_id):
+    """Delete a user (admin only)"""
+    # Prevent admin from deleting themselves
+    if user_id == session['user_id']:
+        return jsonify({'error': '無法刪除自己的帳號'}), 400
+
+    result = database.delete_user(user_id)
+
+    if result['success']:
+        return jsonify({'success': True, 'message': '用戶已刪除'})
+    else:
+        return jsonify({'error': result['error']}), 400
+
+@app.route('/api/change_password', methods=['POST'])
+@login_required
+def change_password():
+    """Change user password"""
+    data = request.get_json()
+    new_password = data.get('new_password')
+
+    if not new_password:
+        return jsonify({'error': '請輸入新密碼'}), 400
+
+    if len(new_password) < 6:
+        return jsonify({'error': '密碼長度至少為 6 個字符'}), 400
+
+    result = database.update_user_password(session['user_id'], new_password)
+
+    if result['success']:
+        return jsonify({'success': True, 'message': '密碼已更新'})
+    else:
+        return jsonify({'error': '更新密碼失敗'}), 500
 
 if __name__ == '__main__':
     # Initialize database

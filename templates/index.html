@@ -32,6 +32,10 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 30px;
+            position: relative;
+        }
+
+        .header-content {
             text-align: center;
         }
 
@@ -43,6 +47,64 @@
         .header p {
             font-size: 1.1em;
             opacity: 0.9;
+        }
+
+        .user-info {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.95em;
+        }
+
+        .user-badge .role {
+            background: rgba(255, 255, 255, 0.3);
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
+            font-size: 0.85em;
+        }
+
+        .btn-logout {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 20px;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 20px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-logout:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: white;
+        }
+
+        .btn-admin {
+            background: rgba(255, 255, 255, 0.9);
+            color: #667eea;
+            padding: 8px 20px;
+            border: none;
+            border-radius: 20px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-admin:hover {
+            background: white;
+            transform: scale(1.05);
         }
 
         .content {
@@ -344,8 +406,20 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>文件資料庫系統</h1>
-            <p>上傳、搜尋、管理您的文件 (支援 Word, Excel, PowerPoint, PDF)</p>
+            <div class="user-info">
+                <div class="user-badge">
+                    <span id="username">{{ user.username }}</span>
+                    <span class="role" id="userRole">{{ '管理員' if user.role == 'admin' else '使用者' }}</span>
+                </div>
+                {% if user.role == 'admin' %}
+                <a href="/admin" class="btn-admin">👥 用戶管理</a>
+                {% endif %}
+                <button class="btn-logout" id="logoutBtn">登出</button>
+            </div>
+            <div class="header-content">
+                <h1>文件資料庫系統</h1>
+                <p>上傳、搜尋、管理您的文件 (支援 Word, Excel, PowerPoint, PDF)</p>
+            </div>
         </div>
 
         <div class="content">
@@ -414,6 +488,29 @@
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        // Logout functionality
+        $('#logoutBtn').on('click', function() {
+            $.ajax({
+                url: '/api/logout',
+                method: 'POST',
+                success: function() {
+                    window.location.href = '/login';
+                },
+                error: function() {
+                    alert('登出失敗，請重試');
+                }
+            });
+        });
+
+        // Handle unauthorized errors globally
+        $(document).ajaxError(function(event, xhr, settings) {
+            if (xhr.status === 401) {
+                alert('您的登入已過期，請重新登入');
+                window.location.href = '/login';
+            }
+        });
+    </script>
     <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>
